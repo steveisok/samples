@@ -3,10 +3,12 @@
     <TargetFramework>net6.0</TargetFramework>
     <TargetArchitecture>x64</TargetArchitecture>
     <RuntimeIdentifier>android-$(TargetArchitecture)</RuntimeIdentifier>
+    <UseMonoRuntime>true</UseMonoRuntime>
     <OutputType>Exe</OutputType>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>link</TrimMode>
     <Configuration>Release</Configuration>
+    <StripDebugSymbols Condition="'$(StripDebugSymbols)' == ''">true</StripDebugSymbols>
     <OutputPath>$(MSBuildThisFileDirectory)bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/publish</OutputPath>
   </PropertyGroup>
 
@@ -34,7 +36,7 @@
   </Target>
 
   <UsingTask TaskName="AndroidAppBuilderTask"
-             AssemblyFile="$(PkgMicrosoft_NET_Runtime_Android_Sample_Mono)\tools\net5.0\AndroidAppBuilder.dll" />
+             AssemblyFile="$(PkgMicrosoft_NET_Runtime_Android_Sample_Mono)\tools\$(TargetFramework)\AndroidAppBuilder.dll" />
 
   <Target Name="BuildApp" AfterTargets="Publish">
     <PropertyGroup>
@@ -49,25 +51,38 @@
     <RemoveDir Directories="$(ApkDir)" />
 
     <AndroidAppBuilderTask
-      RuntimeIdentifier="$(RuntimeIdentifier)"
-      SourceDir="$(OutputPath)"
-      MonoRuntimeHeaders="%(AndroidRuntimePack.PackageDirectory)\runtimes\$(RuntimeIdentifier)\native\include\mono-2.0"
-      MainLibraryFileName="$(AssemblyName).dll"
-      ProjectName="HelloAndroid"
-      OutputDir="$(ApkDir)"
-      StripDebugSymbols="True"
-      KeyStorePath="$(HOME)/.android/"
-      NativeMainSource="$(MSBuildThisFileDirectory)MainActivity.java">
-      <Output TaskParameter="ApkBundlePath" PropertyName="ApkBundlePath" />
-      <Output TaskParameter="ApkPackageId" PropertyName="ApkPackageId" />
+        RuntimeIdentifier="$(RuntimeIdentifier)"
+        ProjectName="HelloAndroid"
+        ForceInterpreter="$(MonoForceInterpreter)"
+        ForceAOT="$(ForceAOT)"
+        MonoRuntimeHeaders="%(AndroidRuntimePack.PackageDirectory)\runtimes\$(RuntimeIdentifier)\native\include\mono-2.0"
+        Assemblies="@(BundleAssemblies)"
+        MainLibraryFileName="$(AssemblyName).dll"
+        StripDebugSymbols="$(StripDebugSymbols)"
+        RuntimeComponents="$(RuntimeComponents)"
+        DiagnosticPorts="$(DiagnosticPorts)"
+        OutputDir="$(ApkDir)"
+        AppDir="$(OutputPath)"
+        KeyStorePath="$(HOME)/.android/"
+        NativeMainSource="$(MSBuildThisFileDirectory)MainActivity.java">
+        <Output TaskParameter="ApkBundlePath" PropertyName="ApkBundlePath" />
+        <Output TaskParameter="ApkPackageId" PropertyName="ApkPackageId" />
     </AndroidAppBuilderTask>
+
+    <Message Importance="High" Text="Apk:       $(ApkBundlePath)"/>
+    <Message Importance="High" Text="PackageId: $(ApkPackageId)"/>
   </Target>
 
   <Target Name="LaunchApp" AfterTargets="BuildApp" Condition="'$(RunningOnCI)' == ''">
     <Exec Command="$(AdbTool) kill-server" />
     <Exec Command="$(AdbTool) start-server" />
     <Exec Command="$(AdbTool) logcat -c" ContinueOnError="WarnAndContinue" />
+
+    <Message Importance="High" Text="Uninstalling apk (ignore errors if any):"/>
+    <Exec Command="$(AdbTool) uninstall net.dot.HelloAndroid" ContinueOnError="WarnAndContinue" />
     <Exec Command="$(AdbTool) install $(ApkDir)/bin/HelloAndroid.apk" />
+
     <Exec Command="$(AdbTool) shell am start -n net.dot.HelloAndroid/net.dot.MainActivity" />
+    <Exec Command="$(AdbTool) logcat -d" />
   </Target>
 </Project>

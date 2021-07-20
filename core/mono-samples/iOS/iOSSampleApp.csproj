@@ -1,33 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetOS>iOS</TargetOS>
     <TargetFramework>net6.0</TargetFramework>
-    <TargetArchitecture>x64</TargetArchitecture>
-    <RuntimeIdentifier>ios-$(TargetArchitecture)</RuntimeIdentifier>
+    <TargetOS Condition="'$(TargetOS)' == ''">iossimulator</TargetOS>
+    <TargetArchitecture Condition="'$(TargetArchitecture)' == ''">x64</TargetArchitecture>
+    <RuntimeIdentifier>$(TargetOS)-$(TargetArchitecture)</RuntimeIdentifier>
+    <UseMonoRuntime>true</UseMonoRuntime>
     <OutputType>Exe</OutputType>
-    <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>link</TrimMode>
+    <!--<PublishTrimmed>true</PublishTrimmed>-->
+    <!--<TrimMode>link</TrimMode>-->
     <Configuration>Release</Configuration>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Runtime.iOS.Sample.Mono" Version="$(BundledNETCoreAppPackageVersion)" GeneratePathProperty="true" />
+    <PackageReference Include="Microsoft.NET.Runtime.MonoTargets.Sdk" Version="$(BundledNETCoreAppPackageVersion)" GeneratePathProperty="true" />
   </ItemGroup>
 
   <UsingTask TaskName="AppleAppBuilderTask"
-             AssemblyFile="$(PkgMicrosoft_NET_Runtime_iOS_Sample_Mono)\tools\net5.0\AppleAppBuilder.dll" />
+             AssemblyFile="$(PkgMicrosoft_NET_Runtime_iOS_Sample_Mono)\tools\$(TargetFramework)\AppleAppBuilder.dll" />
 
   <Target Name="BuildAppBundle" AfterTargets="Publish">
     <PropertyGroup>
-      <AppDir>$(MSBuildThisFileDirectory)$(PublishDir)</AppDir>
-      <IosSimulator Condition="'$(TargetArchitecture)' == 'x64' or '$(TargetArchitecture)' == 'x86'">iPhone 11</IosSimulator>
+      <AppDir>$(MSBuildThisFileDirectory)$(PublishDir)app</AppDir>
+      <IosSimulator Condition="'$(TargetOS)' == 'iOSSimulator'">iPhone 11</IosSimulator>
       <Optimized Condition="'$(Configuration)' == 'Release'">True</Optimized>
     </PropertyGroup>
 
+    <RemoveDir Directories="$(AppDir)" />
+
     <ItemGroup>
-      <BundleAssemblies Include="$(AppDir)\*.dll" />
+      <BundleAssemblies Include="$(PublishDir)\*.dll" />
     </ItemGroup>
 
+<!--
     <AppleAppBuilderTask
       TargetOS="$(TargetOS)"
       ProjectName="HelloiOS"
@@ -44,6 +49,32 @@
       <Output TaskParameter="AppBundlePath" PropertyName="AppBundlePath" />
       <Output TaskParameter="XcodeProjectPath" PropertyName="XcodeProjectPath" />
     </AppleAppBuilderTask>
+-->
+
+    <AppleAppBuilderTask
+        TargetOS="$(TargetOS)"
+        Arch="$(TargetArchitecture)"
+        EnableRuntimeLogging="true"
+        ProjectName="HelloiOS"
+        MonoRuntimeHeaders="%(ResolvedRuntimePack.PackageDirectory)\runtimes\$(RuntimeIdentifier)\native\include\mono-2.0"
+        Assemblies="@(BundleAssemblies)"
+        MainLibraryFileName="$(MSBuildThisFileName).dll"
+        GenerateXcodeProject="True"
+        BuildAppBundle="True"
+        DevTeamProvisioning="$(DevTeamProvisioning)"
+        OutputDirectory="$(AppDir)"
+        Optimized="$(Optimized)"
+        ForceAOT="$(RunAOTCompilation)"
+        ForceInterpreter="$(MonoForceInterpreter)"
+        RuntimeComponents="$(RuntimeComponents)"
+        DiagnosticPorts="$(DiagnosticPorts)"
+        AppDir="$(MSBuildThisFileDirectory)$(PublishDir)">
+        <Output TaskParameter="AppBundlePath" PropertyName="AppBundlePath" />
+        <Output TaskParameter="XcodeProjectPath" PropertyName="XcodeProjectPath" />
+    </AppleAppBuilderTask>
+
+    <Message Importance="High" Text="Xcode: $(XcodeProjectPath)"/>
+    <Message Importance="High" Text="App:   $(AppBundlePath)"/>
   </Target>
 
   <Target Name="LaunchApp" AfterTargets="BuildAppBundle" Condition="'$(RunningOnCI)' == ''">

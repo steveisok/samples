@@ -19,6 +19,8 @@ public class MainActivity extends Activity
     static
     {
         System.loadLibrary("native-lib");
+        System.loadLibrary("System.Security.Cryptography.Native.Android");
+        System.loadLibrary("monodroid");
     }
 
     // Called from JNI
@@ -111,7 +113,7 @@ public class MainActivity extends Activity
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
-                int retcode = MonoRunner.initialize(entryPointLibName, ctx);
+                int retcode = MonoRunner.initialize(entryPointLibName, new String[0], ctx);
                 welcomeMsg.setText("Hello Android " + retcode + "!\nRunning on mono runtime\nUsing C#");
             }
         }, 1000);
